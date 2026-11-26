@@ -1,0 +1,20 @@
+{
+  "name": "poc-rabbitmq",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "up": "docker compose up -d --wait",
+    "down": "docker compose down",
+    "typecheck": "tsc"
+  },
+  "dependencies": {
+    "amqplib": "^2.4.2"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.11",
+    "typescript": "^7.0.2"
+  },
+  "engines": {
+    "node": ">=22.18"
+  }
+}
