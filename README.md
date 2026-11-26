@@ -1,6 +1,6 @@
-# Aprende RabbitMQ haciendo (Node.js + TypeScript)
+# Mi práctica de RabbitMQ (Node.js + TypeScript)
 
-Curso práctico en español para aprender **RabbitMQ 4.x** desde cero: una lección por concepto,
+Repositorio personal donde practico **RabbitMQ 4.x** desde cero: una lección por concepto,
 código ejecutable, experimentos para "romper" cosas y, al final, una mini-aplicación de pedidos.
 
 ## Requisitos
@@ -22,7 +22,7 @@ Interfaz de administración: http://localhost:15672 — usuario `guest`, clave `
 
 Para apagar: `npm run down`. Para borrar también los datos: `docker compose down -v`.
 
-## Mapa del curso
+## Mi avance
 
 | # | Tema | Estado |
 |---|---|---|
