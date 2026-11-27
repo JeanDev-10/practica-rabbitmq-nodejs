@@ -29,7 +29,7 @@ Para apagar: `npm run down`. Para borrar también los datos: `docker compose dow
 | 0 | [Fundamentos](lessons/00-fundamentos/README.md) | ✅ |
 | 1 | [Hola mundo](lessons/01-hola-mundo/README.md) | ✅ |
 | 2 | [Work queues, ack y prefetch](lessons/02-work-queues/README.md) | ✅ |
-| 3 | Publish/Subscribe (`fanout`) | ⏳ |
+| 3 | [Publish/Subscribe (`fanout`)](lessons/03-pubsub-fanout/README.md) | ✅ |
 | 4 | Routing (`direct`) | ⏳ |
 | 5 | `topic` y `headers` | ⏳ |
 | 6 | Fiabilidad: confirms, returns, idempotencia | ⏳ |
