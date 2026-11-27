@@ -1,25 +1,26 @@
 // Publica los outbox de todos los servicios y marca como enviado lo que el broker confirma.
 import { setTimeout as sleep } from 'node:timers/promises';
-import { connect } from '../shared/rabbit.ts';
+import type { ConfirmChannel } from 'amqplib';
+import { connectAs } from './lib/connection.ts';
 import { pool, publishers, transaction, type Publisher } from './lib/db.ts';
-import { declare, exchange } from './lib/events.ts';
+import { exchange } from './lib/events.ts';
 
-const { connection } = await connect();
-let running = true;
-// Fase 1: si se pierde el broker el proceso termina; lo pendiente queda en la base de datos.
-connection.on('close', () => {
-  if (running) {
-    console.error('[relay] conexión con RabbitMQ perdida');
-    process.exit(1);
-  }
-});
-const channel = await connection.createConfirmChannel();
-await declare(channel);
-
+/** Sin definir mientras no haya conexión. */
+let channel: ConfirmChannel | undefined;
 let returned = false;
-channel.on('return', () => (returned = true));
 
-function publishBatch(schema: Publisher) {
+const connection = await connectAs('relay', async (model) => {
+  const created = await model.createConfirmChannel();
+  created.on('error', (err) => console.error('[relay] canal cerrado:', err.message));
+  created.on('return', () => (returned = true));
+  created.on('close', () => {
+    if (channel === created) channel = undefined;
+  });
+  channel = created;
+  console.log('[relay] listo');
+});
+
+function publishBatch(current: ConfirmChannel, schema: Publisher) {
   return transaction(async (client) => {
     const { rows } = await client.query(
       `SELECT id, event_id, tipo, datos FROM ${schema}.outbox
@@ -30,13 +31,14 @@ function publishBatch(schema: Publisher) {
 
     for (const event of rows) {
       returned = false;
-      channel.publish(exchange, event.tipo, Buffer.from(JSON.stringify(event.datos)), {
+      current.publish(exchange, event.tipo, Buffer.from(JSON.stringify(event.datos)), {
         persistent: true,
         mandatory: true,
         messageId: event.event_id,
+        type: event.tipo,
         contentType: 'application/json',
       });
-      await channel.waitForConfirms();
+      await current.waitForConfirms();
       if (returned) throw new Error(`sin cola para ${event.tipo}`);
       await client.query(`UPDATE ${schema}.outbox SET published_at = now() WHERE id = $1`, [
         event.id,
@@ -46,13 +48,15 @@ function publishBatch(schema: Publisher) {
   });
 }
 
+let running = true;
 process.once('SIGINT', () => (running = false));
-console.log('[relay] buscando eventos pendientes');
 
 while (running) {
   try {
     let published = 0;
-    for (const schema of publishers) published += await publishBatch(schema);
+    for (const schema of publishers) {
+      if (channel) published += await publishBatch(channel, schema);
+    }
     if (published === 0) await sleep(300);
   } catch (err) {
     console.error('[relay] error, se reintentará:', (err as Error).message);

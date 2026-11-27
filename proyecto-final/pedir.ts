@@ -15,7 +15,8 @@ const order = (await response.json()) as { id?: string; estado?: string; error?:
 console.log(response.status, order);
 
 if (order.id) {
-  for (let attempt = 0; attempt < 20; attempt++) {
+  // 30 s: más que la suma de las esperas entre reintentos.
+  for (let attempt = 0; attempt < 60; attempt++) {
     await sleep(500);
     const current = (await (await fetch(`${api}/${order.id}`)).json()) as { estado: string };
     if (current.estado !== 'pendiente') {
@@ -23,6 +24,6 @@ if (order.id) {
       process.exit(0);
     }
   }
-  console.log('Sigue pendiente. ¿Están todos los servicios en marcha?');
+  console.log('Sigue pendiente. Revisa que los servicios estén en marcha y node fallidas.ts');
   process.exitCode = 1;
 }

@@ -2,7 +2,7 @@ import type { Channel } from 'amqplib';
 
 export const exchange = 'proyecto.eventos';
 const deadExchange = 'proyecto.dlx';
-const deadQueue = 'proyecto.fallidas';
+export const deadQueue = 'proyecto.fallidas';
 
 export type EventType =
   | 'pedido.creado'
@@ -37,9 +37,15 @@ export const queues = {
 
 export type Service = keyof typeof queues;
 
+/** Espera antes de cada reintento, en milisegundos. */
+export const delays = [2000, 4000, 8000];
+export const retryExchange = (service: Service) => `proyecto.${service}.reintentos`;
+export const retryQueue = (service: Service, delay: number) =>
+  `proyecto.${service}.reintento.${delay}`;
+
 /**
- * Todos los procesos declaran la topología completa: así ningún evento se queda sin cola
- * porque su consumidor todavía no haya arrancado.
+ * Crea toda la topología. Solo la ejecuta `preparar.ts` con un usuario administrador:
+ * los servicios no tienen permiso para declarar nada.
  */
 export async function declare(channel: Channel) {
   await channel.assertExchange(exchange, 'topic', { durable: true });
@@ -47,12 +53,31 @@ export async function declare(channel: Channel) {
   await channel.assertQueue(deadQueue, { durable: true });
   await channel.bindQueue(deadQueue, deadExchange, '');
 
-  for (const { name, events } of Object.values(queues)) {
+  for (const service of Object.keys(queues) as Service[]) {
+    const { name, events } = queues[service];
     await channel.assertQueue(name, {
       durable: true,
       deadLetterExchange: deadExchange,
       arguments: { 'x-queue-type': 'quorum', 'x-delivery-limit': 5 },
     });
     for (const event of events) await channel.bindQueue(name, exchange, event);
+
+    // Colas de espera sin consumidores: al vencer el TTL, el mensaje vuelve a su servicio.
+    await channel.assertExchange(retryExchange(service), 'direct', { durable: true });
+    for (const delay of delays) {
+      await channel.assertQueue(retryQueue(service, delay), {
+        durable: true,
+        messageTtl: delay,
+        deadLetterExchange: '',
+        deadLetterRoutingKey: name,
+        arguments: {
+          'x-queue-type': 'quorum',
+          // El mensaje no sale de aquí hasta que la cola destino lo confirma.
+          'x-dead-letter-strategy': 'at-least-once',
+          'x-overflow': 'reject-publish',
+        },
+      });
+      await channel.bindQueue(retryQueue(service, delay), retryExchange(service), String(delay));
+    }
   }
 }

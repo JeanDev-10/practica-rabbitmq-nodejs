@@ -1,29 +1,48 @@
-import { setTimeout as sleep } from 'node:timers/promises';
+import type { ConfirmChannel, ConsumeMessage } from 'amqplib';
 import type pg from 'pg';
-import { connect } from '../../shared/rabbit.ts';
+import { connectAs } from './connection.ts';
 import { pool, transaction } from './db.ts';
-import { declare, queues, type EventData, type EventType, type Service } from './events.ts';
+import {
+  delays,
+  queues,
+  retryExchange,
+  type EventData,
+  type EventType,
+  type Service,
+} from './events.ts';
 
-/** Devuelve el texto a mostrar en el log. */
+/** Devuelve el texto a mostrar en el log. Si lanza un error, se reintenta. */
 type Handler = (client: pg.PoolClient, type: EventType, data: EventData) => Promise<string>;
 
-/** Consumidor con inbox: el registro del mensaje y sus efectos van en una transacción. */
+/** Consumidor con inbox, reintentos con espera creciente y reconexión. */
 export async function startService(service: Service, handler: Handler) {
-  const { connection, channel } = await connect();
-  let closing = false;
-  // Fase 1: si se pierde el broker el proceso termina (la reconexión llega en la fase 2).
-  connection.on('close', () => {
-    if (!closing) {
-      console.error(`[${service}] conexión con RabbitMQ perdida`);
-      process.exit(1);
-    }
-  });
-  await declare(channel);
-  await channel.prefetch(1);
+  async function retryOrDiscard(channel: ConfirmChannel, message: ConsumeMessage, error: Error) {
+    const retries = Number(message.properties.headers?.['x-reintentos'] ?? 0);
+    const delay = delays[retries];
 
-  await channel.consume(queues[service].name, async (message) => {
-    if (!message) return;
-    const type = message.fields.routingKey as EventType;
+    if (delay === undefined) {
+      console.error(`[${service}] sin más reintentos, a la DLQ: ${error.message}`);
+      channel.nack(message, false, false);
+      return;
+    }
+
+    console.warn(
+      `[${service}] intento ${retries + 1} falló (${error.message}). Espera ${delay / 1000} s`,
+    );
+    channel.publish(retryExchange(service), String(delay), message.content, {
+      persistent: true,
+      messageId: message.properties.messageId, // el mismo, para que el inbox lo reconozca
+      type: message.properties.type,
+      contentType: message.properties.contentType,
+      headers: { 'x-reintentos': retries + 1 },
+    });
+    await channel.waitForConfirms(); // primero la copia, después se borra el original
+    channel.ack(message);
+  }
+
+  async function process_(channel: ConfirmChannel, message: ConsumeMessage) {
+    // Tras un reintento la routing key es el nombre de la cola, por eso se usa `type`.
+    const type = (message.properties.type ?? message.fields.routingKey) as EventType;
     const id: string | undefined = message.properties.messageId;
 
     let data: EventData;
@@ -31,6 +50,7 @@ export async function startService(service: Service, handler: Handler) {
       data = JSON.parse(message.content.toString());
       if (!id || !data.pedidoId) throw new Error('faltan messageId o pedidoId');
     } catch (err) {
+      // Error permanente: reintentar no lo arreglaría.
       console.error(`[${service}] mensaje inválido, a la DLQ:`, (err as Error).message);
       channel.nack(message, false, false);
       return;
@@ -48,16 +68,31 @@ export async function startService(service: Service, handler: Handler) {
       console.log(`[${service}] ${data.pedidoId.slice(0, 8)} ${result}`);
       channel.ack(message);
     } catch (err) {
-      console.error(`[${service}] error:`, (err as Error).message);
-      await sleep(1000);
-      channel.reject(message, true); // cuenta para delivery-limit y acaba en la DLQ
+      await retryOrDiscard(channel, message, err as Error);
     }
+  }
+
+  const connection = await connectAs(service, async (model) => {
+    const channel = await model.createConfirmChannel();
+    // El broker cerró el canal (por ejemplo, falta la topología o un permiso).
+    channel.on('error', (err) => {
+      console.error(`[${service}] canal cerrado: ${err.message}`);
+      process.exit(1);
+    });
+    await channel.prefetch(1);
+    await channel.consume(queues[service].name, async (message) => {
+      if (!message) return;
+      try {
+        await process_(channel, message);
+      } catch (err) {
+        // Típicamente la conexión se cayó a mitad: sin ack, el broker lo reentregará.
+        console.warn(`[${service}] mensaje sin confirmar: ${(err as Error).message}`);
+      }
+    });
+    console.log(`[${service}] escuchando`);
   });
 
-  console.log(`[${service}] escuchando`);
-
   process.once('SIGINT', async () => {
-    closing = true;
     await connection.close();
     await pool.end();
     process.exit(0);

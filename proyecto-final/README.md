@@ -1,7 +1,6 @@
 # Proyecto final — Sistema de pedidos con saga
 
-Estado: **fase 1** (camino feliz y compensación). Pendientes: fallos (fase 2) y verificación
-automática (fase 3).
+Estado: **fase 2** (fallos). Pendiente: verificación automática (fase 3).
 
 ## Flujo
 
@@ -83,9 +82,63 @@ el stock.
 | **Coreografía** (este proyecto) | cada servicio reacciona a eventos | pocos pasos |
 | Orquestación | un coordinador envía órdenes y decide | muchos pasos o ramas; el flujo se ve en un sitio |
 
-## Limitaciones de la fase 1
+## Fallos
 
-- Si RabbitMQ se cae, el relay y los consumidores terminan y hay que arrancarlos de nuevo.
-- Un error temporal se reintenta cada segundo, sin espera creciente, hasta ir a la DLQ.
-- Un pedido cuyo evento acaba en la DLQ se queda `pendiente`.
-- Todos usan el usuario `guest` y la misma base de datos.
+| Situación | Qué hace el sistema |
+|---|---|
+| Error temporal (pasarela o base de datos) | reintenta a los 2, 4 y 8 s |
+| Reintentos agotados | a `proyecto.fallidas`, para **revisión manual** |
+| Mensaje mal formado | directo a la DLQ |
+| RabbitMQ se reinicia | relay y consumidores reconectan; lo pendiente sigue en el outbox |
+| Mensaje repetido | el inbox lo ignora |
+
+Los reintentos pasan por un exchange propio de cada servicio hacia colas con TTL
+(`proyecto.<servicio>.reintento.<ms>`), que devuelven el mensaje a su cola.
+
+### Pasarela caída que se recupera
+
+```bash
+node proyecto-final/pasarela.ts caida
+node proyecto-final/pedir.ts teclado 1
+node proyecto-final/pasarela.ts ok        # en otra terminal, antes de unos 14 s
+```
+
+### Pasarela caída que no se recupera
+
+Repite sin ejecutar `ok`. El pedido queda `pendiente` con el stock reservado:
+
+```bash
+node proyecto-final/fallidas.ts                 # ver
+node proyecto-final/pasarela.ts ok
+node proyecto-final/fallidas.ts --reprocesar    # el pedido se completa
+```
+
+No se cancela solo a propósito: con una pasarela real, un fallo de conexión no dice si el cobro
+llegó a hacerse. Alguien debe comprobarlo.
+
+### Reinicio del broker
+
+```bash
+docker compose restart rabbitmq
+```
+
+## Usuarios y permisos
+
+`preparar.ts` (como administrador) crea la topología y un usuario por servicio. Ninguno puede
+declarar ni borrar nada.
+
+| Usuario | Publica en | Consume de |
+|---|---|---|
+| `relay` | `proyecto.eventos` | — |
+| `<servicio>` | `proyecto.<servicio>.reintentos` | `proyecto.<servicio>` |
+
+Las claves son de práctica, solo para local.
+
+## Limitaciones
+
+- La API no usa RabbitMQ, pero depende de PostgreSQL.
+- Todos los servicios usan el mismo usuario de base de datos: la separación por esquemas es una
+  convención, no un permiso.
+- `pasarela.ts` simula el fallo; el cobro es una fila en una tabla.
+- Nadie avisa cuando algo llega a la DLQ: en producción haría falta una alerta.
+- Con un solo nodo de RabbitMQ no hay alta disponibilidad.
