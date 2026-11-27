@@ -35,7 +35,7 @@ Para apagar: `npm run down`. Para borrar también los datos: `docker compose dow
 | 6 | [Fiabilidad: confirms, returns, idempotencia](lessons/06-fiabilidad/README.md) | ✅ |
 | 7 | [Errores: DLX, TTL, reintentos](lessons/07-errores-reintentos/README.md) | ✅ |
 | 8 | [RPC](lessons/08-rpc/README.md) | ✅ |
-| 9 | Quorum queues y streams | ⏳ |
+| 9 | [Quorum queues y streams](lessons/09-quorum-streams/README.md) | ✅ |
 | 10 | Operación y producción | ⏳ |
 | 11 | Outbox e Inbox con PostgreSQL | ⏳ |
 | — | Proyecto final: sistema de pedidos | ⏳ |
