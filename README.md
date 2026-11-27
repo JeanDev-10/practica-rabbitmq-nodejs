@@ -30,7 +30,7 @@ Para apagar: `npm run down`. Para borrar también los datos: `docker compose dow
 | 1 | [Hola mundo](lessons/01-hola-mundo/README.md) | ✅ |
 | 2 | [Work queues, ack y prefetch](lessons/02-work-queues/README.md) | ✅ |
 | 3 | [Publish/Subscribe (`fanout`)](lessons/03-pubsub-fanout/README.md) | ✅ |
-| 4 | Routing (`direct`) | ⏳ |
+| 4 | [Routing (`direct`)](lessons/04-routing-direct/README.md) | ✅ |
 | 5 | `topic` y `headers` | ⏳ |
 | 6 | Fiabilidad: confirms, returns, idempotencia | ⏳ |
 | 7 | Errores: DLX, TTL, reintentos | ⏳ |
