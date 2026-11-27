@@ -37,13 +37,13 @@ Para apagar: `npm run down`. Para borrar también los datos: `docker compose dow
 | 8 | [RPC](lessons/08-rpc/README.md) | ✅ |
 | 9 | [Quorum queues y streams](lessons/09-quorum-streams/README.md) | ✅ |
 | 10 | [Operación y producción](lessons/10-operacion/README.md) | ✅ |
-| 11 | Outbox e Inbox con PostgreSQL | ⏳ |
+| 11 | [Outbox e Inbox con PostgreSQL](lessons/11-outbox/README.md) | ✅ |
 | — | Proyecto final: sistema de pedidos | ⏳ |
 
 ## Estructura
 
 ```
-docker-compose.yml   RabbitMQ con interfaz de administración
+docker-compose.yml   RabbitMQ (con interfaz de administración) y PostgreSQL
 shared/rabbit.ts     Conexión y canal reutilizables
 lessons/             Una carpeta por lección (README + código)
 ```

@@ -8,10 +8,12 @@
     "typecheck": "tsc"
   },
   "dependencies": {
-    "amqplib": "^2.4.2"
+    "amqplib": "^2.4.2",
+    "pg": "^8.23.1"
   },
   "devDependencies": {
     "@types/node": "^26.6.11",
+    "@types/pg": "^8.23.1",
     "typescript": "^7.0.2"
   },
   "engines": {
