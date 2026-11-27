@@ -38,7 +38,7 @@ Para apagar: `npm run down`. Para borrar también los datos: `docker compose dow
 | 9 | [Quorum queues y streams](lessons/09-quorum-streams/README.md) | ✅ |
 | 10 | [Operación y producción](lessons/10-operacion/README.md) | ✅ |
 | 11 | [Outbox e Inbox con PostgreSQL](lessons/11-outbox/README.md) | ✅ |
-| — | Proyecto final: sistema de pedidos | ⏳ |
+| — | [Proyecto final: sistema de pedidos con saga](proyecto-final/README.md) | ✅ |
 
 ## Estructura
 
@@ -46,6 +46,7 @@ Para apagar: `npm run down`. Para borrar también los datos: `docker compose dow
 docker-compose.yml   RabbitMQ (con interfaz de administración) y PostgreSQL
 shared/rabbit.ts     Conexión y canal reutilizables
 lessons/             Una carpeta por lección (README + código)
+proyecto-final/      Sistema de pedidos que combina las lecciones
 ```
 
 ## Comandos útiles
@@ -54,4 +55,5 @@ lessons/             Una carpeta por lección (README + código)
 docker compose exec rabbitmq rabbitmqctl list_queues name messages_ready messages_unacknowledged consumers
 docker compose logs -f rabbitmq
 npm run typecheck
+npm run verificar    # prueba el proyecto final (borra sus datos)
 ```

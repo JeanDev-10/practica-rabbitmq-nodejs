@@ -5,7 +5,8 @@
   "scripts": {
     "up": "docker compose up -d --wait",
     "down": "docker compose down",
-    "typecheck": "tsc"
+    "typecheck": "tsc",
+    "verificar": "node proyecto-final/verificar.ts"
   },
   "dependencies": {
     "amqplib": "^2.4.2",
