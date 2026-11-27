@@ -37,6 +37,7 @@ Para apagar: `npm run down`. Para borrar también los datos: `docker compose dow
 | 8 | RPC | ⏳ |
 | 9 | Quorum queues y streams | ⏳ |
 | 10 | Operación y producción | ⏳ |
+| 11 | Outbox e Inbox con PostgreSQL | ⏳ |
 | — | Proyecto final: sistema de pedidos | ⏳ |
 
 ## Estructura
